@@ -15,28 +15,33 @@ champions_df = pd.read_csv(CSV_PATH)
 champions = champions_df.to_dict(orient='records')
 
 
-# List all champions, optionally filter by role
+
+# List all champions
 @app.get("/champions", response_model=List[dict])
-def get_champions(role: Optional[str] = None):
-    if role:
-        filtered = [c for c in champions if str(c.get('role', '')).lower() == role.lower()]
-        return filtered
+def get_champions():
     return champions
 
-# Get all unique roles
+# Get all unique tags
 @app.get("/roles", response_model=List[str])
 def get_roles():
     roles = set()
     for champ in champions:
-        role = champ.get('role', None)
-        if role:
-            roles.add(str(role))
+        tags = champ.get('Tags', '')
+        for tag in str(tags).split(','):
+            tag = tag.strip().lower()
+            if tag:
+                roles.add(tag)
     return sorted(list(roles))
 
-# Get all champions by a specific role
+# Get all champions by a specific tag
 @app.get("/champions/role/{role}", response_model=List[dict])
 def get_champions_by_role(role: str):
-    filtered = [c for c in champions if str(c.get('role', '')).lower() == role.lower()]
+    filtered = []
+    for c in champions:
+        tags = c.get('Tags', '')
+        tag_list = [t.strip().lower() for t in str(tags).split(',') if t.strip()]
+        if role.lower() in tag_list:
+            filtered.append(c)
     if not filtered:
         raise HTTPException(status_code=404, detail="No champions found for this role")
     return filtered
@@ -48,18 +53,15 @@ def get_random_champion():
         raise HTTPException(status_code=404, detail="No champions available")
     return random.choice(champions)
 
-# Search champions by partial name match
-@app.get("/champions/search/{query}", response_model=List[dict])
-def search_champions(query: str):
-    results = [c for c in champions if query.lower() in str(c.get('name', '')).lower()]
-    if not results:
-        raise HTTPException(status_code=404, detail="No champions found matching query")
-    return results
 
 @app.get("/champions/{name}")
 def get_champion_by_name(name: str):
     """Get a champion by name (case-insensitive)."""
     for champ in champions:
-        if str(champ.get('name', '')).lower() == name.lower():
+        if str(champ.get('Name', '')).lower() == name.lower():
             return champ
     raise HTTPException(status_code=404, detail="Champion not found")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=10000, reload=False)
